@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from src.models.user import db, Cliente, Visita, Ponto, NivelEnum, LojaEnum, Campanha
 from datetime import datetime
+from sqlalchemy import or_
 import re
 
 visita_bp = Blueprint('visita', __name__)
@@ -286,3 +287,29 @@ def relatorio_visitas():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ==============================
+# NOVAS ROTAS DE BUSCA DE CLIENTE
+# ==============================
+
+@visita_bp.route('/clientes/cpf/<cpf>', methods=['GET'])
+def buscar_cliente_por_cpf(cpf):
+    """Busca um cliente pelo CPF exato."""
+    cliente = Cliente.query.filter_by(cpf=cpf).first()
+    if not cliente:
+        return jsonify({'error': 'Cliente não encontrado'}), 404
+    return jsonify(cliente.to_dict())
+
+@visita_bp.route('/clientes/buscar', methods=['GET'])
+def buscar_clientes():
+    """Busca clientes por nome, loja ou CPF."""
+    termo = request.args.get('q', '').strip()
+    if not termo:
+        return jsonify([])
+    clientes = Cliente.query.filter(
+        or_(
+            Cliente.nome.ilike(f'%{termo}%'),
+            Cliente.cpf.ilike(f'%{termo}%'),
+            Cliente.loja.ilike(f'%{termo}%')
+        )
+    ).limit(15).all()
+    return jsonify([c.to_dict() for c in clientes])
